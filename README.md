@@ -4,6 +4,8 @@ Un CRM pensant fer fer servir al explai Xivarri i a femXivarri.
 
 A Docker Compose deployment of [SuiteCRM](https://suitecrm.com/) 8.10.1 — a self-hosted, open-source CRM. It runs as four containers: an Envoy reverse proxy (the only one reachable from outside), the SuiteCRM app itself, a MariaDB database, and a background worker for scheduled/async tasks.
 
+Branded for Esplai Xivarri: the logo and color scheme (navy `#003388`, amber `#f0bc00`) are taken from [xivarri.org](https://xivarri.org/) and baked into the image at build time — see `branding/` and the relevant `Dockerfile` steps, and `CLAUDE.md` for how it's done and why.
+
 ## Prerequisites
 
 - Docker and Docker Compose (`docker compose version`)
