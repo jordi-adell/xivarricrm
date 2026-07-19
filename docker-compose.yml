@@ -1,0 +1,58 @@
+services:
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SUITECRM_ADMIN_USER: ${SUITECRM_ADMIN_USER}
+      SUITECRM_ADMIN_PASSWORD: ${SUITECRM_ADMIN_PASSWORD}
+      SITE_URL: ${SITE_URL}
+      DEMO_DATA: ${DEMO_DATA}
+    ports:
+      - "8080:8080"
+    volumes:
+      - app_data:/apps
+
+  worker:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SUITECRM_ADMIN_USER: ${SUITECRM_ADMIN_USER}
+      SUITECRM_ADMIN_PASSWORD: ${SUITECRM_ADMIN_PASSWORD}
+      SITE_URL: ${SITE_URL}
+      DEMO_DATA: ${DEMO_DATA}
+    volumes:
+      - app_data:/apps
+    command: ["php", "bin/console", "messenger:consume", "internal-async", "--time-limit=3600"]
+
+volumes:
+  db_data:
+  app_data:
