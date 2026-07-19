@@ -95,6 +95,10 @@ RUN sed -ri -e 's!/var/www/html!/apps/public!g' \
 
 WORKDIR /apps
 
+# Override the base php:8.3-apache image's inherited "EXPOSE 80" — Apache in this image
+# actually listens on 8888 (see above), so 80 is stale/misleading metadata otherwise.
+EXPOSE 8888
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
