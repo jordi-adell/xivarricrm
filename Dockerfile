@@ -59,6 +59,8 @@ COPY --chown=www-data:www-data branding/logo-login.png /apps/public/legacy/theme
 COPY --chown=www-data:www-data branding/logo-login.svg /apps/public/legacy/themes/suite8/images/p_login_logo.svg
 COPY --chown=www-data:www-data branding/logo-login.svg /apps/public/legacy/themes/suite8/images/icon_p_login_logo_32.svg
 COPY --chown=www-data:www-data branding/logo-login.svg /apps/public/legacy/themes/suite8/images/sidebar/modules/p_login_logo.svg
+COPY --chown=www-data:www-data branding/favicon.ico /apps/public/favicon.ico
+COPY --chown=www-data:www-data branding/favicon.ico /apps/public/dist/themes/suite8/images/favicon.ico
 
 # Recolor SuiteCRM's default palette to Esplai Xivarri's brand colors (taken from xivarri.org's
 # own CSS: navy #003388, amber #f0bc00) across every compiled stylesheet that uses it — this
