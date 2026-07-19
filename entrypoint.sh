@@ -19,6 +19,11 @@ echo "Database is up."
 install_suitecrm() {
     echo "Starting temporary Apache instance for installer self-checks..."
     apache2ctl start
+    until php -r "exit(@file_get_contents('http://localhost:8888/') === false ? 1 : 0);" >/dev/null 2>&1; do
+        sleep 1
+    done
+
+    echo "Waiting for ${SITE_URL} to be reachable through envoy..."
     until php -r "exit(@file_get_contents('${SITE_URL}/') === false ? 1 : 0);" >/dev/null 2>&1; do
         sleep 1
     done

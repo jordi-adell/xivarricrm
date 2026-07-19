@@ -51,8 +51,8 @@ RUN printf 'upload_max_filesize = 100M\npost_max_size = 100M\nmemory_limit = 256
 RUN sed -ri -e 's!/var/www/html!/apps/public!g' \
         /etc/apache2/sites-available/*.conf \
         /etc/apache2/apache2.conf \
-    && sed -ri -e 's/Listen 80/Listen 8080/' /etc/apache2/ports.conf \
-    && sed -ri -e 's/:80>/:8080>/' /etc/apache2/sites-available/*.conf \
+    && sed -ri -e 's/Listen 80/Listen 8888/' /etc/apache2/ports.conf \
+    && sed -ri -e 's/:80>/:8888>/' /etc/apache2/sites-available/*.conf \
     && printf '<Directory /apps/public>\n\tAllowOverride All\n\tRequire all granted\n</Directory>\n' \
         > /etc/apache2/conf-available/suitecrm.conf \
     && a2enconf suitecrm
