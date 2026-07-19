@@ -13,6 +13,13 @@ A Docker Compose deployment of [SuiteCRM](https://suitecrm.com/) 8.10.1 — a se
 
 You only need two files — `docker-compose.yml` and `.env.example` — no source checkout required. This pulls the prebuilt image from GitHub Container Registry (`ghcr.io/jordi-adell/xivarricrm`) instead of building anything locally.
 
+The image is private (it lives in a private GitHub repo), so you need to authenticate to `ghcr.io` before it can be pulled. Use a [personal access token](https://github.com/settings/tokens) with at least the `read:packages` scope:
+
+```bash
+docker login ghcr.io -u <your-github-username>
+# paste your PAT (with read:packages scope) as the password
+```
+
 ```bash
 curl -O https://raw.githubusercontent.com/jordi-adell/xivarricrm/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/jordi-adell/xivarricrm/main/.env.example
