@@ -45,7 +45,7 @@ COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions
 COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 COPY --from=builder /apps /apps
 
-RUN printf 'upload_max_filesize = 100M\npost_max_size = 100M\nmemory_limit = 256M\nmax_execution_time = 3600\nmax_input_vars = 5000\nerror_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT & ~E_NOTICE & ~E_WARNING\n' \
+RUN printf 'upload_max_filesize = 100M\npost_max_size = 100M\nmemory_limit = 256M\nmax_execution_time = 3600\nmax_input_vars = 5000\nerror_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT & ~E_NOTICE & ~E_WARNING\ndisplay_errors = Off\nlog_errors = On\n' \
         > /usr/local/etc/php/conf.d/suitecrm.ini
 
 # Esplai Xivarri branding — logo assets derived from https://xivarri.org/ (see branding/ in this repo)
