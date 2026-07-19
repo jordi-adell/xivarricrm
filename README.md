@@ -13,7 +13,7 @@ Branded for Esplai Xivarri: the logo and color scheme (navy `#003388`, amber `#f
 
 ## Quick start (no clone needed)
 
-You only need two files — `docker-compose.yml` and `.env.example` — no source checkout required. This pulls the prebuilt image from GitHub Container Registry (`ghcr.io/jordi-adell/xivarricrm`) instead of building anything locally.
+You need three files — `docker-compose.yml`, `.env.example`, and `envoy/envoy.yaml` — no source checkout required. This pulls the prebuilt image from GitHub Container Registry (`ghcr.io/jordi-adell/xivarricrm`) instead of building anything locally.
 
 The image is private (it lives in a private GitHub repo), so you need to authenticate to `ghcr.io` before it can be pulled. Use a [personal access token](https://github.com/settings/tokens) with at least the `read:packages` scope:
 
@@ -25,10 +25,14 @@ docker login ghcr.io -u <your-github-username>
 ```bash
 curl -O https://raw.githubusercontent.com/jordi-adell/xivarricrm/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/jordi-adell/xivarricrm/main/.env.example
+mkdir -p envoy && curl -o envoy/envoy.yaml https://raw.githubusercontent.com/jordi-adell/xivarricrm/main/envoy/envoy.yaml
+chmod 644 envoy/envoy.yaml
 cp .env.example .env
 # edit .env: set real passwords and admin credentials (leave SITE_URL as-is, see note below)
 docker compose up -d
 ```
+
+> **Requires Docker Compose v2 or newer** (any reasonably recent version — no special feature version needed for this file-based config). If `docker compose up` complains about `envoy/envoy.yaml` being unreadable inside the container, re-check that `chmod 644` step — see the note in `CLAUDE.md` about why.
 
 The first time it starts, `app` runs SuiteCRM's CLI installer automatically — this takes a minute or two. Watch it with:
 
