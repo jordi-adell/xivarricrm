@@ -32,10 +32,11 @@ docker compose down -v
 
 ## Architecture
 
-Three services in `docker-compose.yml`, one shared image built from the multi-stage `Dockerfile`:
+Four services in `docker-compose.yml`, three of them the same image built from the multi-stage `Dockerfile`:
 
+- **`envoy`** — the only service with a `ports:` mapping to the host (8080). Everything else is reachable only from other containers on the compose network. See "Envoy: single ingress point" below.
 - **`db`** — `mariadb:11`, data in the `db_data` volume, healthchecked via `healthcheck.sh`.
-- **`app`** — serves SuiteCRM over Apache on port 8080 (mapped to host 8080), code/config in the `app_data` volume.
+- **`app`** — serves SuiteCRM over Apache on port 8080 *inside the compose network only* (no host port mapping — traffic reaches it exclusively through `envoy`), code/config in the `app_data` volume.
 - **`worker`** — same image as `app`, but overrides `command` to run `bin/console messenger:consume internal-async` (SuiteCRM 8.10+ needs this running or background/scheduled tasks — email, workflows — queue forever and never execute). The receiver name is `internal-async`, **not** `async`.
 
 ### Dockerfile: why it's multi-stage
@@ -58,6 +59,12 @@ This is why `SITE_URL` (in `.env`) must resolve to the same port Apache actually
 The `worker` container runs the *same* entrypoint script but never installs anything itself: it just polls for `/apps/public/legacy/config.php` to exist (written by `app`), then execs its `messenger:consume` command. Installation is owned exclusively by `app` to avoid two containers racing to install against the same fresh DB.
 
 Idempotency for `app` itself is a simple existence check on `config.php` — a second start (restart, recreate) skips straight to serving.
+
+### Envoy: single ingress point
+
+`envoy/envoy.yaml` defines one listener (0.0.0.0:8080) that proxies everything to the `app` cluster (`app:8080`) — there is no other route, no other cluster, and the admin interface is bound to `127.0.0.1:9901` inside the container (not published). This, combined with `app`/`db`/`worker` no longer publishing any ports of their own, means the host can reach nothing except through Envoy's single listener — there's no separate "firewall rule" step, the compose topology itself enforces it.
+
+One real gotcha hit while setting this up: the official `envoyproxy/envoy` image drops privileges from root to a built-in `envoy` user (uid 101) via `su-exec` before reading its config (see `/docker-entrypoint.sh` in the image). A bind-mounted `envoy.yaml` that isn't world-readable on the host fails with a misleading `unable to read file` error — the fix is keeping `envoy/envoy.yaml` at least `644`.
 
 ### Volumes: why `app_data` isn't a bind mount
 

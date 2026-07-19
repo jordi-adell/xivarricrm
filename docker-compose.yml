@@ -30,10 +30,18 @@ services:
       SUITECRM_ADMIN_PASSWORD: ${SUITECRM_ADMIN_PASSWORD}
       SITE_URL: ${SITE_URL}
       DEMO_DATA: ${DEMO_DATA}
+    volumes:
+      - app_data:/apps
+
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    restart: unless-stopped
+    depends_on:
+      - app
     ports:
       - "8080:8080"
     volumes:
-      - app_data:/apps
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
 
   worker:
     build: .

@@ -4,7 +4,7 @@ Un CRM pensant fer fer servir al explai Xivarri i a femXivarri.
 
 A Docker Compose deployment of [SuiteCRM](https://suitecrm.com/) 8.10.1 — a self-hosted, open-source CRM.
 
-This repo doesn't contain SuiteCRM's source: the Dockerfile downloads the official release zip and builds a runnable image from it (PHP 8.3 + Apache), wired up to a MariaDB database and a background worker via Docker Compose.
+This repo doesn't contain SuiteCRM's source: the Dockerfile downloads the official release zip and builds a runnable image from it (PHP 8.3 + Apache), wired up to a MariaDB database, a background worker, and an Envoy reverse proxy via Docker Compose.
 
 ## Prerequisites
 
@@ -20,12 +20,13 @@ cp .env.example .env
 make up
 ```
 
-`make up` builds the image and starts three containers:
+`make up` builds the image and starts four containers:
 
 | Service  | Role |
 |----------|------|
+| `envoy`  | Reverse proxy — the only container that publishes a port to the host (8080); forwards everything to `app` |
 | `db`     | MariaDB 11 — SuiteCRM's database |
-| `app`    | Apache + PHP 8.3 serving SuiteCRM on port 8080 |
+| `app`    | Apache + PHP 8.3 serving SuiteCRM, reachable only from `envoy` |
 | `worker` | Same image as `app`, runs the Messenger worker that processes SuiteCRM's background/scheduled tasks (emails, workflows) |
 
 The first time it starts, `app` runs SuiteCRM's CLI installer automatically — this takes a minute or two. Watch it with:
