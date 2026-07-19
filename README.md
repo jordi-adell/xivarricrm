@@ -9,6 +9,7 @@ This repo doesn't contain SuiteCRM's source: the Dockerfile downloads the offici
 ## Prerequisites
 
 - Docker and Docker Compose (`docker compose version`)
+- `make`
 - Port 8080 free on the host
 
 ## Getting started
