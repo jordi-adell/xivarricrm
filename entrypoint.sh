@@ -23,7 +23,7 @@ install_suitecrm() {
         sleep 1
     done
 
-    echo "Waiting for ${SITE_URL} to be reachable through envoy..."
+    echo "Waiting for ${SITE_URL} to be reachable through the reverse proxy..."
     until php -r "exit(@file_get_contents('${SITE_URL}/') === false ? 1 : 0);" >/dev/null 2>&1; do
         sleep 1
     done

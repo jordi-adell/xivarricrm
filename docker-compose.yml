@@ -33,16 +33,19 @@ services:
     volumes:
       - app_data:/apps
 
-  envoy:
-    image: envoyproxy/envoy:v1.31-latest
+  caddy:
+    image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
       - app
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
     configs:
-      - source: envoy_config
-        target: /etc/envoy/envoy.yaml
+      - source: caddy_config
+        target: /etc/caddy/Caddyfile
 
   worker:
     image: ghcr.io/jordi-adell/xivarricrm:latest
@@ -75,47 +78,20 @@ volumes:
       type: none
       o: bind
       device: ${PWD}/data/app
+  caddy_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/caddy
 
 configs:
-  envoy_config:
+  caddy_config:
     content: |
-      static_resources:
-        listeners:
-          - name: app_ingress
-            address:
-              socket_address: { address: 0.0.0.0, port_value: 80 }
-            filter_chains:
-              - filters:
-                  - name: envoy.filters.network.http_connection_manager
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-                      stat_prefix: ingress_http
-                      route_config:
-                        name: local_route
-                        virtual_hosts:
-                          - name: suitecrm
-                            domains: ["*"]
-                            routes:
-                              - match: { prefix: "/" }
-                                route: { cluster: suitecrm_app }
-                      http_filters:
-                        - name: envoy.filters.http.router
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      {
+        ${ACME_EMAIL:+email ${ACME_EMAIL}}
+      }
 
-        clusters:
-          - name: suitecrm_app
-            connect_timeout: 5s
-            type: STRICT_DNS
-            lb_policy: ROUND_ROBIN
-            load_assignment:
-              cluster_name: suitecrm_app
-              endpoints:
-                - lb_endpoints:
-                    - endpoint:
-                        address:
-                          socket_address: { address: app, port_value: 8888 }
-
-      admin:
-        address:
-          socket_address: { address: 127.0.0.1, port_value: 9901 }
+      ${DOMAIN:-:80} {
+        reverse_proxy app:8888
+      }

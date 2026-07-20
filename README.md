@@ -2,7 +2,7 @@
 
 Un CRM pensant fer fer servir al explai Xivarri i a femXivarri.
 
-A Docker Compose deployment of [SuiteCRM](https://suitecrm.com/) 8.10.1 — a self-hosted, open-source CRM. It runs as four containers: an Envoy reverse proxy (the only one reachable from outside), the SuiteCRM app itself, a MariaDB database, and a background worker for scheduled/async tasks.
+A Docker Compose deployment of [SuiteCRM](https://suitecrm.com/) 8.10.1 — a self-hosted, open-source CRM. It runs as four containers: a Caddy reverse proxy (the only one reachable from outside, with automatic HTTPS if you give it a domain), the SuiteCRM app itself, a MariaDB database, and a background worker for scheduled/async tasks.
 
 Branded for Esplai Xivarri: the logo and color scheme (navy `#003388`, amber `#f0bc00`) are taken from [xivarri.org](https://xivarri.org/) and baked into the image at build time — see `branding/` and the relevant `Dockerfile` steps, and `CLAUDE.md` for how it's done and why.
 
@@ -40,13 +40,13 @@ Once it's done, open **http://localhost/** and log in with the `SUITECRM_ADMIN_U
 
 ### Services
 
-Only `envoy` uses the standard web port (80) — nothing else is reachable from the host at all.
+Only `caddy` uses the standard web ports (80/443) — nothing else is reachable from the host at all.
 
 | Service  | Role |
 |----------|------|
-| `envoy`  | Reverse proxy — the only container that publishes a port to the host, on the standard HTTP port (80); forwards everything to `app` on its internal, non-standard port |
+| `caddy`  | Reverse proxy — the only container that publishes ports to the host (80 and 443); forwards everything to `app` on its internal, non-standard port. Automatically obtains and renews a Let's Encrypt certificate if `DOMAIN` is set (see "HTTPS" below) |
 | `db`     | MariaDB 11 — SuiteCRM's database, internal only |
-| `app`    | Apache + PHP 8.3 serving SuiteCRM on port 8888 *inside the compose network only*, reachable exclusively through `envoy` |
+| `app`    | Apache + PHP 8.3 serving SuiteCRM on port 8888 *inside the compose network only*, reachable exclusively through `caddy` |
 | `worker` | Same image as `app`, runs the Messenger worker that processes SuiteCRM's background/scheduled tasks (emails, workflows) |
 
 ### Configuration
@@ -58,10 +58,16 @@ All configuration lives in `.env` (copy it from `.env.example`, never commit it)
 | `DB_ROOT_PASSWORD` | MariaDB root password |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | SuiteCRM's database and credentials |
 | `SUITECRM_ADMIN_USER`, `SUITECRM_ADMIN_PASSWORD` | Admin account created by the installer |
-| `SITE_URL` | Address SuiteCRM's installer self-checks against **from inside the `app` container** — defaults to `http://envoy`, Docker's internal DNS name for the proxy. See note below before changing it. |
+| `SITE_URL` | Address SuiteCRM's installer self-checks against **from inside the `app` container** — defaults to `http://caddy`, Docker's internal DNS name for the proxy. See note below before changing it. |
 | `DEMO_DATA` | `yes`/`no` — whether to seed demo data during install |
+| `DOMAIN` | Optional. A real public hostname (e.g. `crm.example.org`) that resolves to this host. When set, `caddy` automatically obtains and renews an HTTPS certificate for it. Leave unset for local/HTTP-only use. |
+| `ACME_EMAIL` | Optional. Email address given to Let's Encrypt for expiry/problem notifications. Only used when `DOMAIN` is set. |
 
-> **About `SITE_URL`:** SuiteCRM's installer performs live HTTP self-checks against this exact address at install time, so it has to be reachable from inside the `app` container — that's why the default is the internal `http://envoy`, not `http://localhost`. Verified in testing: browsing through `http://localhost/` still works correctly (redirects and the GraphQL API are relative/path-based, not built from an absolute `site_url`). If you're deploying behind a real public domain, either leave this as `http://envoy` for install and update the public URL afterwards in SuiteCRM's admin settings, or point `SITE_URL` at something resolvable from inside `app` at install time — plain `http://localhost` won't work here since Apache no longer listens on the standard port.
+> **About `SITE_URL`:** SuiteCRM's installer performs live HTTP self-checks against this exact address at install time, so it has to be reachable from inside the `app` container — that's why the default is the internal `http://caddy`, not `http://localhost`. Verified in testing: browsing through `http://localhost/` still works correctly (redirects and the GraphQL API are relative/path-based, not built from an absolute `site_url`). If you're deploying behind a real public domain, either leave this as `http://caddy` for install and update the public URL afterwards in SuiteCRM's admin settings, or point `SITE_URL` at something resolvable from inside `app` at install time — plain `http://localhost` won't work here since Apache no longer listens on the standard port.
+
+### HTTPS
+
+Set `DOMAIN` (and optionally `ACME_EMAIL`) in `.env` before starting the stack, then `docker compose up -d` as usual. `caddy` automatically requests a certificate from Let's Encrypt via the HTTP-01 challenge (it needs port 80 reachable from the internet at that domain to do this) and renews it on its own well before expiry — no other steps required. Leave `DOMAIN` unset (the default) to keep serving plain HTTP on port 80, exactly as before.
 
 ### Common tasks
 
@@ -85,7 +91,7 @@ docker compose logs -f db
 
 ### Data persistence
 
-SuiteCRM's files/config and the database live on the host at `./data/app` and `./data/db`, next to the compose file (bind-mounted via Docker's `local` driver). Stopping and restarting containers (`docker compose down` / `up`) keeps your data; only `docker compose down -v` wipes it.
+SuiteCRM's files/config, the database, and (if HTTPS is enabled) Caddy's certificates live on the host at `./data/app`, `./data/db`, and `./data/caddy`, next to the compose file (bind-mounted via Docker's `local` driver). Stopping and restarting containers (`docker compose down` / `up`) keeps your data; only `docker compose down -v` wipes it.
 
 ### Troubleshooting
 
