@@ -85,7 +85,7 @@ docker compose logs -f db
 
 ### Data persistence
 
-SuiteCRM's files/config and the database live in two Docker-managed volumes, `app_data` and `db_data` — not in this repo. Stopping and restarting containers (`docker compose down` / `up`) keeps your data; only `docker compose down -v` wipes it.
+SuiteCRM's files/config and the database live on the host at `./data/app` and `./data/db`, next to the compose file (bind-mounted via Docker's `local` driver). Stopping and restarting containers (`docker compose down` / `up`) keeps your data; only `docker compose down -v` wipes it.
 
 ### Troubleshooting
 
