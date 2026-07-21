@@ -112,7 +112,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ${PWD}/data/backups
+      device: ${PWD}/backups
 
 configs:
   caddy_config:
