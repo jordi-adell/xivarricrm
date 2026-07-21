@@ -80,6 +80,7 @@ services:
       RESTIC_PASSWORD_FILE: /backup/restic-password
     volumes:
       - app_data:/data/app:ro
+      - caddy_data:/data/caddy:ro
       - backup_repo:/backup
     entrypoint: ["sh", "/scripts/entrypoint.sh"]
     configs:
@@ -156,11 +157,11 @@ configs:
         restic init
       fi
 
-      echo "Backing up database dump and app data..."
-      restic backup "$$DUMP_DIR" /data/app --tag xivarricrm
+      echo "Backing up database dump, app data, and caddy data..."
+      restic backup "$$DUMP_DIR" /data/app /data/caddy --host xivarricrm --tag xivarricrm
 
       echo "Pruning old snapshots..."
-      restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune
+      restic forget --host xivarricrm --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune
 
       rm -rf "$$DUMP_DIR"
       echo "Backup complete."

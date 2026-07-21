@@ -48,7 +48,7 @@ Only `caddy` uses the standard web ports (80/443) — nothing else is reachable 
 | `db`     | MariaDB 11 — SuiteCRM's database, internal only |
 | `app`    | Apache + PHP 8.3 serving SuiteCRM on port 8888 *inside the compose network only*, reachable exclusively through `caddy` |
 | `worker` | Same image as `app`, runs the Messenger worker that processes SuiteCRM's background/scheduled tasks (emails, workflows) |
-| `backup` | Daily (03:00) database dump + restic backup of SuiteCRM's files to `./data/backups` (see "Backups" below) |
+| `backup` | Daily (03:00) restic backup covering the database (via `mariadb-dump`, not raw `data/db` files), `data/app`, and `data/caddy` — stored in `./backups` (see "Backups" below) |
 
 ### Configuration
 
@@ -72,11 +72,16 @@ Set `DOMAIN` (and optionally `ACME_EMAIL`) in `.env` before starting the stack, 
 
 ### Backups
 
-The `backup` service dumps the database and archives SuiteCRM's files (`app_data`) into a [restic](https://restic.net/) repository once a day (03:00), automatically pruning old snapshots to 7 daily / 4 weekly / 6 monthly. It doesn't back up Caddy's certificates — those are cheap to re-obtain from Let's Encrypt and not worth the storage.
+The `backup` service backs up everything under `data/` into a [restic](https://restic.net/) repository once a day (03:00), automatically pruning old snapshots to 7 daily / 4 weekly / 6 monthly:
 
-**`data/backups` is meant to be an NFS mount (or other off-host storage) that you set up yourself before starting the stack** — unlike `data/db`/`data/app`/`data/caddy`, `make up` deliberately does *not* auto-create this directory. A backup that lands on the same disk as the data it's protecting doesn't protect against a disk failure, so if `data/backups` doesn't exist (e.g. the NFS mount isn't active), `docker compose up` will fail loudly rather than silently writing "backups" to a local folder that provides no real redundancy.
+- **Database**: via `mariadb-dump` over the network, not by copying `data/db`'s raw files directly — MariaDB is live while the backup runs, and a raw file copy of an in-use database directory isn't guaranteed to be consistent, whereas a logical dump is.
+- **`data/app`** and **`data/caddy`**: backed up as files directly (read-only mounts), since these aren't a live database and don't have that consistency concern.
 
-The repository is still encrypted (restic has no unencrypted mode), but there's no password for you to manage: on first start, `backup` generates a random password itself and stores it at `data/backups/restic-password`, right alongside the repository (`data/backups/repo/`) — no `.env` secret involved. This trades off the "password is separate from the data, so a single leak doesn't expose both" property for "the password can never be lost as long as the backup storage itself survives," which fits since the whole point of `data/backups` being off-host (NFS) storage is that it's expected to outlive the machine running the containers.
+**`backups/` is meant to be an NFS mount (or other off-host storage) that you set up yourself before starting the stack** — unlike `data/db`/`data/app`/`data/caddy`, `make up` deliberately does *not* auto-create this directory. A backup that lands on the same disk as the data it's protecting doesn't protect against a disk failure, so if `backups/` doesn't exist (e.g. the NFS mount isn't active), `docker compose up` will fail loudly rather than silently writing "backups" to a local folder that provides no real redundancy.
+
+The repository is still encrypted (restic has no unencrypted mode), but there's no password for you to manage: on first start, `backup` generates a random password itself and stores it at `backups/restic-password`, right alongside the repository (`backups/repo/`) — no `.env` secret involved. This trades off the "password is separate from the data, so a single leak doesn't expose both" property for "the password can never be lost as long as the backup storage itself survives," which fits since the whole point of `backups/` being off-host (NFS) storage is that it's expected to outlive the machine running the containers.
+
+Every backup runs under a fixed `--host xivarricrm` identity (both `restic backup` and `restic forget`), rather than letting restic default to the container's own hostname — container recreation (image updates, config changes) gives the container a new hostname each time, and restic's retention policy groups/prunes per hostname by default. Without pinning it, every recreation would silently start a brand-new retention group instead of extending the existing one.
 
 Useful commands:
 ```bash
@@ -112,7 +117,7 @@ docker compose logs -f db
 
 ### Data persistence
 
-SuiteCRM's files/config, the database, and (if HTTPS is enabled) Caddy's certificates live on the host at `./data/app`, `./data/db`, and `./data/caddy`, next to the compose file (bind-mounted via Docker's `local` driver). Stopping and restarting containers (`docker compose down` / `up`) keeps your data; only `docker compose down -v` wipes it. `./data/backups` (the restic repository — see "Backups" above) is separate: it's expected to be off-host storage you mount yourself, not created automatically.
+SuiteCRM's files/config, the database, and (if HTTPS is enabled) Caddy's certificates live on the host at `./data/app`, `./data/db`, and `./data/caddy`, next to the compose file (bind-mounted via Docker's `local` driver). Stopping and restarting containers (`docker compose down` / `up`) keeps your data; only `docker compose down -v` wipes it. `./backups` (the restic repository — see "Backups" above) is separate: it's expected to be off-host storage you mount yourself, not created automatically.
 
 ### Troubleshooting
 
