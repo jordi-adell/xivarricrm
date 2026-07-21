@@ -65,6 +65,29 @@ services:
       - app_data:/apps
     command: ["php", "bin/console", "messenger:consume", "internal-async", "--time-limit=3600"]
 
+  backup:
+    image: restic/restic:0.19.1
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      RESTIC_REPOSITORY: /repo
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+    volumes:
+      - app_data:/data/app:ro
+      - backup_repo:/repo
+    entrypoint: ["sh", "/scripts/entrypoint.sh"]
+    configs:
+      - source: backup_entrypoint
+        target: /scripts/entrypoint.sh
+      - source: backup_run
+        target: /scripts/run.sh
+
 volumes:
   db_data:
     driver: local
@@ -84,6 +107,12 @@ volumes:
       type: none
       o: bind
       device: ${PWD}/data/caddy
+  backup_repo:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/backups
 
 configs:
   caddy_config:
@@ -95,3 +124,35 @@ configs:
       ${DOMAIN:-:80} {
         reverse_proxy app:8888
       }
+  backup_entrypoint:
+    content: |
+      #!/bin/sh
+      set -eu
+      apk add --no-cache mariadb-client >/dev/null
+      echo "0 3 * * * sh /scripts/run.sh >>/proc/1/fd/1 2>>/proc/1/fd/2" > /etc/crontabs/root
+      echo "Backup cron installed (daily at 03:00 container time)."
+      exec crond -f -d 8
+  backup_run:
+    content: |
+      #!/bin/sh
+      set -eu
+      DUMP_DIR=/tmp/dump
+      rm -rf "$$DUMP_DIR"
+      mkdir -p "$$DUMP_DIR"
+
+      echo "Dumping database..."
+      mariadb-dump -h "$$DB_HOST" -u"$$DB_USER" -p"$$DB_PASSWORD" "$$DB_NAME" > "$$DUMP_DIR/db.sql"
+
+      if ! restic snapshots >/dev/null 2>&1; then
+        echo "No existing restic repository found, initializing..."
+        restic init
+      fi
+
+      echo "Backing up database dump and app data..."
+      restic backup "$$DUMP_DIR" /data/app --tag xivarricrm
+
+      echo "Pruning old snapshots..."
+      restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune
+
+      rm -rf "$$DUMP_DIR"
+      echo "Backup complete."
