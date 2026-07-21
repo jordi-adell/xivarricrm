@@ -76,11 +76,11 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      RESTIC_REPOSITORY: /repo
-      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      RESTIC_REPOSITORY: /backup/repo
+      RESTIC_PASSWORD_FILE: /backup/restic-password
     volumes:
       - app_data:/data/app:ro
-      - backup_repo:/repo
+      - backup_repo:/backup
     entrypoint: ["sh", "/scripts/entrypoint.sh"]
     configs:
       - source: backup_entrypoint
@@ -129,6 +129,14 @@ configs:
       #!/bin/sh
       set -eu
       apk add --no-cache mariadb-client >/dev/null
+
+      mkdir -p /backup/repo
+      if [ ! -f /backup/restic-password ]; then
+        echo "No restic password file found, generating one..."
+        head -c 32 /dev/urandom | base64 > /backup/restic-password
+        chmod 600 /backup/restic-password
+      fi
+
       echo "0 3 * * * sh /scripts/run.sh >>/proc/1/fd/1 2>>/proc/1/fd/2" > /etc/crontabs/root
       echo "Backup cron installed (daily at 03:00 container time)."
       exec crond -f -d 8

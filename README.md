@@ -63,7 +63,6 @@ All configuration lives in `.env` (copy it from `.env.example`, never commit it)
 | `DEMO_DATA` | `yes`/`no` — whether to seed demo data during install |
 | `DOMAIN` | Optional. A real public hostname (e.g. `crm.example.org`) that resolves to this host. When set, `caddy` automatically obtains and renews an HTTPS certificate for it. Leave unset for local/HTTP-only use. |
 | `ACME_EMAIL` | Optional. Email address given to Let's Encrypt for expiry/problem notifications. Only used when `DOMAIN` is set. |
-| `RESTIC_PASSWORD` | Encrypts the `backup` service's restic repository at `./data/backups`. **Losing this makes existing backups permanently unrecoverable** — restic encrypts client-side, there is no recovery path. Store it somewhere durable, separate from this host. |
 
 > **About `SITE_URL`:** SuiteCRM's installer performs live HTTP self-checks against this exact address at install time, so it has to be reachable from inside the `app` container — that's why the default is the internal `http://caddy`, not `http://localhost`. Verified in testing: browsing through `http://localhost/` still works correctly (redirects and the GraphQL API are relative/path-based, not built from an absolute `site_url`). If you're deploying behind a real public domain, either leave this as `http://caddy` for install and update the public URL afterwards in SuiteCRM's admin settings, or point `SITE_URL` at something resolvable from inside `app` at install time — plain `http://localhost` won't work here since Apache no longer listens on the standard port.
 
@@ -77,7 +76,7 @@ The `backup` service dumps the database and archives SuiteCRM's files (`app_data
 
 **`data/backups` is meant to be an NFS mount (or other off-host storage) that you set up yourself before starting the stack** — unlike `data/db`/`data/app`/`data/caddy`, `make up` deliberately does *not* auto-create this directory. A backup that lands on the same disk as the data it's protecting doesn't protect against a disk failure, so if `data/backups` doesn't exist (e.g. the NFS mount isn't active), `docker compose up` will fail loudly rather than silently writing "backups" to a local folder that provides no real redundancy.
 
-Set `RESTIC_PASSWORD` in `.env` before first starting the stack (restic refuses to run without it) — see the warning in the Configuration table above.
+The repository is still encrypted (restic has no unencrypted mode), but there's no password for you to manage: on first start, `backup` generates a random password itself and stores it at `data/backups/restic-password`, right alongside the repository (`data/backups/repo/`) — no `.env` secret involved. This trades off the "password is separate from the data, so a single leak doesn't expose both" property for "the password can never be lost as long as the backup storage itself survives," which fits since the whole point of `data/backups` being off-host (NFS) storage is that it's expected to outlive the machine running the containers.
 
 Useful commands:
 ```bash
