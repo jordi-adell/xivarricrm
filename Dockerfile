@@ -48,6 +48,11 @@ COPY --from=builder /apps /apps
 RUN printf 'upload_max_filesize = 100M\npost_max_size = 100M\nmemory_limit = 256M\nmax_execution_time = 3600\nmax_input_vars = 5000\nerror_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT & ~E_NOTICE & ~E_WARNING\ndisplay_errors = Off\nlog_errors = On\n' \
         > /usr/local/etc/php/conf.d/suitecrm.ini
 
+# Prefer IPv4 for dual-stack DNS results (e.g. smtp.gmail.com) — this container has no IPv6
+# route, so an unpatched resolver order makes PHP's mailer hard-fail with EADDRNOTAVAIL
+# (surfaced by SuiteCRM as "SMTP error: 99") instead of using the working IPv4 address.
+RUN printf 'precedence ::ffff:0:0/96  100\n' >> /etc/gai.conf
+
 # Esplai Xivarri branding — logo assets derived from https://xivarri.org/ (see branding/ in this repo)
 # company_logo.png is reused verbatim (same <img src>) in both the navy topbar and the
 # white login-page background, so it's a navy-on-white "badge" rather than a flat navy
