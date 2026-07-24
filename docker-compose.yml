@@ -138,8 +138,8 @@ configs:
         chmod 600 /backup/restic-password
       fi
 
-      echo "0 3 * * * sh /scripts/run.sh >>/proc/1/fd/1 2>>/proc/1/fd/2" > /etc/crontabs/root
-      echo "Backup cron installed (daily at 03:00 container time)."
+      echo "0 5 * * * sh /scripts/run.sh >>/proc/1/fd/1 2>>/proc/1/fd/2" > /etc/crontabs/root
+      echo "Backup cron installed (daily at 05:00 container time)."
       exec crond -f -d 8
   backup_run:
     content: |
