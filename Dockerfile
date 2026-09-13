@@ -28,7 +28,7 @@ RUN unzip /suitecrm.zip -d /apps/ \
     && find /apps -type d -exec chmod 2755 {} \; \
     && find /apps -type f -exec chmod 0644 {} \; \
     && chown -R www-data:www-data /apps \
-    && chmod +x /apps/bin/console
+    && chmod +x /apps/bin/console \
     && cat /apps/VERSION
 
 
