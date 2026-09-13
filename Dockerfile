@@ -20,7 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zip \
     && rm -rf /var/lib/apt/lists/*
 
-ADD https://suitecrm.com/download/168/suite810/568626/suitecrm-8-10-1.zip /suitecrm.zip
+ARG VERSION=8.10.2
+ADD https://github.com/SuiteCRM/SuiteCRM-Core/releases/download/v${VERSION}/SuiteCRM-${VERSION}.zip /suitecrm.zip
+
 RUN unzip /suitecrm.zip -d /apps/ \
     && rm /suitecrm.zip \
     && find /apps -type d -exec chmod 2755 {} \; \
