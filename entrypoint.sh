@@ -6,6 +6,7 @@ set -euo pipefail
 DEMO_DATA="${DEMO_DATA:-no}"
 
 CONFIG_FILE=/apps/public/legacy/config.php
+IMAGE_VERSION=$(cat /suitecrm-version 2>/dev/null || echo "")
 
 echo "Waiting for database at ${DB_HOST}..."
 until php -r "
@@ -15,6 +16,34 @@ until php -r "
     sleep 2
 done
 echo "Database is up."
+
+upgrade_suitecrm() {
+    local version="$1"
+    local zip_url="https://github.com/SuiteCRM/SuiteCRM-Core/releases/download/v${version}/SuiteCRM-${version}.zip"
+    local zip_path="/tmp/suitecrm-upgrade.zip"
+
+    echo "Downloading SuiteCRM ${version} upgrade package..."
+    curl -fsSL -o "${zip_path}" "${zip_url}"
+
+    echo "Starting temporary Apache instance for upgrade self-checks..."
+    apache2ctl start
+    until php -r "exit(@file_get_contents('http://localhost:8888/') === false ? 1 : 0);" >/dev/null 2>&1; do
+        sleep 1
+    done
+
+    echo "Waiting for ${SITE_URL} to be reachable through the reverse proxy..."
+    until php -r "exit(@file_get_contents('${SITE_URL}/') === false ? 1 : 0);" >/dev/null 2>&1; do
+        sleep 1
+    done
+
+    echo "Running SuiteCRM upgrade to ${version}..."
+    php bin/console suitecrm:app:upgrade -p "${zip_path}"
+    php bin/console suitecrm:app:upgrade-finalize
+
+    apache2ctl stop
+    sleep 1
+    rm -f "${zip_path}"
+}
 
 install_suitecrm() {
     echo "Starting temporary Apache instance for installer self-checks..."
@@ -53,7 +82,17 @@ if [ ! -f "$CONFIG_FILE" ]; then
         done
     fi
 else
-    echo "SuiteCRM already installed, skipping installer."
+    if [ -n "${IMAGE_VERSION}" ] && [ "${1:-}" = "apache2-foreground" ]; then
+        INSTALLED_VERSION=$(cat /apps/VERSION 2>/dev/null || echo "")
+        if [ -n "${INSTALLED_VERSION}" ] && [ "${IMAGE_VERSION}" != "${INSTALLED_VERSION}" ]; then
+            echo "Upgrading SuiteCRM from ${INSTALLED_VERSION} to ${IMAGE_VERSION}..."
+            upgrade_suitecrm "${IMAGE_VERSION}"
+        else
+            echo "SuiteCRM ${INSTALLED_VERSION} is current, skipping upgrade."
+        fi
+    else
+        echo "SuiteCRM already installed, skipping installer."
+    fi
 fi
 
 chown -R www-data:www-data /apps
