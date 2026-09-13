@@ -1,3 +1,5 @@
+ARG VERSION=8.10.2
+
 FROM php:8.3-apache AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -20,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zip \
     && rm -rf /var/lib/apt/lists/*
 
-ARG VERSION=8.10.2
+ARG VERSION
 ADD https://github.com/SuiteCRM/SuiteCRM-Core/releases/download/v${VERSION}/SuiteCRM-${VERSION}.zip /suitecrm.zip
 
 RUN unzip /suitecrm.zip -d /apps/ \
@@ -29,7 +31,6 @@ RUN unzip /suitecrm.zip -d /apps/ \
     && find /apps -type f -exec chmod 0644 {} \; \
     && chown -R www-data:www-data /apps \
     && chmod +x /apps/bin/console
-RUN cat /apps/VERSION
 
 
 FROM php:8.3-apache
@@ -103,7 +104,7 @@ RUN sed -ri -e 's!/var/www/html!/apps/public!g' \
 
 WORKDIR /apps
 
-ARG VERSION=8.10.2
+ARG VERSION
 RUN echo "${VERSION}" > /suitecrm-version
 
 # Override the base php:8.3-apache image's inherited "EXPOSE 80" — Apache in this image
