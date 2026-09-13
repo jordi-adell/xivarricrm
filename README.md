@@ -83,17 +83,50 @@ The repository is still encrypted (restic has no unencrypted mode), but there's 
 
 Every backup runs under a fixed `--host xivarricrm` identity (both `restic backup` and `restic forget`), rather than letting restic default to the container's own hostname — container recreation (image updates, config changes) gives the container a new hostname each time, and restic's retention policy groups/prunes per hostname by default. Without pinning it, every recreation would silently start a brand-new retention group instead of extending the existing one.
 
-Useful commands:
+#### Checking backups
+
 ```bash
 # Trigger a backup immediately instead of waiting for the 03:00 schedule
 docker compose exec backup sh /scripts/run.sh
 
-# List snapshots
+# List snapshots (note the snapshot ID if you want to restore something other than the latest)
 docker compose exec backup restic snapshots
 
-# Restore a snapshot's contents to a scratch directory for inspection
-docker compose exec backup restic restore latest --target /tmp/restore
+# List the files inside a specific snapshot without restoring anything
+docker compose exec backup restic ls latest
+
+# Verify the repository itself isn't corrupted (checks structure + data integrity)
+docker compose exec backup restic check
 ```
+
+#### Restoring a backup
+
+A restore has two parts — the database (from the `mariadb-dump` inside the snapshot) and the `app`/`caddy` files — since they're backed up differently (see above). Stop the app-facing services first so nothing is writing to `data/app`/`data/caddy` while you overwrite them; leave `db` running so you can pipe the SQL dump straight into it.
+
+```bash
+# 1. Stop everything except the database
+docker compose stop app worker caddy
+
+# 2. Restore the snapshot into a scratch directory inside the backup container
+#    (swap `latest` for a snapshot ID from `restic snapshots` to restore an older point in time)
+docker compose exec backup restic restore latest --target /tmp/restore
+
+# 3. Restore the database from the dump it contains
+docker cp "$(docker compose ps -q backup)":/tmp/restore/tmp/dump/db.sql ./db.sql
+docker compose exec -T db mariadb -u root -p"$DB_ROOT_PASSWORD" "$DB_NAME" < ./db.sql
+rm ./db.sql
+
+# 4. Restore app and Caddy files onto their host directories
+docker cp "$(docker compose ps -q backup)":/tmp/restore/data/app/. ./data/app/
+docker cp "$(docker compose ps -q backup)":/tmp/restore/data/caddy/. ./data/caddy/
+
+# 5. Bring everything back up
+docker compose up -d
+```
+
+No manual `chown` is needed after step 4 — `entrypoint.sh` re-chowns `/apps` to `www-data` on every `app` start regardless of how the files got there.
+
+If you only need the database (e.g. undoing bad data, not a full disaster recovery), steps 1, 2 (for `tmp/dump/db.sql` only), and 3 are enough — you can skip stopping `caddy`/`worker` and skip step 4 entirely.
 
 ### Common tasks
 
