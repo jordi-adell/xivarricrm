@@ -85,8 +85,14 @@ else
     if [ -n "${IMAGE_VERSION}" ] && [ "${1:-}" = "apache2-foreground" ]; then
         INSTALLED_VERSION=$(cat /apps/VERSION 2>/dev/null || echo "")
         if [ -n "${INSTALLED_VERSION}" ] && [ "${IMAGE_VERSION}" != "${INSTALLED_VERSION}" ]; then
-            echo "Upgrading SuiteCRM from ${INSTALLED_VERSION} to ${IMAGE_VERSION}..."
-            upgrade_suitecrm "${IMAGE_VERSION}"
+            image_series=$(echo "${IMAGE_VERSION}" | cut -d. -f1,2)
+            installed_series=$(echo "${INSTALLED_VERSION}" | cut -d. -f1,2)
+            if [ "${image_series}" = "${installed_series}" ]; then
+                echo "Upgrading SuiteCRM from ${INSTALLED_VERSION} to ${IMAGE_VERSION}..."
+                upgrade_suitecrm "${IMAGE_VERSION}"
+            else
+                echo "Minor/major version change detected (${INSTALLED_VERSION} -> ${IMAGE_VERSION}). Skipping automatic upgrade — run manually."
+            fi
         else
             echo "SuiteCRM ${INSTALLED_VERSION} is current, skipping upgrade."
         fi
